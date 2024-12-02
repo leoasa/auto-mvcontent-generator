@@ -1,0 +1,24 @@
+# API Clients
+google-api-python-client==2.108.0  # For YouTube API
+openai==1.3.0  # For Whisper API
+requests==2.31.0  # For HTTP requests
+
+# Video Processing
+# pytube==15.0.0  # For YouTube video downloads
+yt-dlp>=2023.12.30  # For YouTube video downloads
+isodate>=0.6.1  # For parsing YouTube duration format
+moviepy==1.0.3  # For video editing
+git+https://github.com/indigocalifornia/mvgen.git
+attrs>=21.3.0  # Required by mvgen
+PyWavelets>=1.4.1  # Required by mvgen for audio processing
+scipy>=1.11.3  # Required by mvgen for audio processing
+unidecode>=1.3.6  # Required by mvgen for text processing
+
+# Security
+cryptography==41.0.5  # For secure token handling
+
+# Utility
+python-dotenv==1.0.0  # For environment variable management 
+
+# Configuration
+PyYAML==6.0.1  # For YAML configuration

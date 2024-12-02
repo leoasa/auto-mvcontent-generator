@@ -1,0 +1,15 @@
+# Video Source Configuration
+video_source:
+  use_youtube_search: true  # Set to false to use manual video input
+  max_youtube_results: 5    # Number of YouTube videos to search for
+
+# Video Processing
+video_processing:
+  fontsize: 24             # Font size for lyrics overlay
+  text_color: "white"      # Color of lyrics text
+  text_position: "bottom"  # Position of lyrics overlay
+
+# Output Configuration
+output:
+  music_video_filename: "generated_music_video.mp4"
+  final_video_filename: "final_video.mp4" 
