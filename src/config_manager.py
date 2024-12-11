@@ -21,4 +21,16 @@ class ConfigManager:
     
     @property
     def max_youtube_results(self) -> int:
-        return self.get_video_source_config().get('max_youtube_results', 5) 
+        return self.get_video_source_config().get('max_youtube_results', 5)
+    
+    @property
+    def prompt(self) -> str:
+        return self.get_video_source_config().get('prompt')
+    
+    @property
+    def audio_file(self) -> str:
+        return self.get_video_source_config().get('audio_file')
+    
+    @property
+    def has_predefined_input(self) -> bool:
+        return self.prompt is not None and self.audio_file is not None

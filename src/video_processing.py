@@ -1,9 +1,18 @@
 from googleapiclient.discovery import build
-from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
+from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip
 import os
 from mvgen.mvgen import MVGen
 import tempfile
 from .config_manager import ConfigManager
+
+class SimpleNotifier:
+    def notify(self, message):
+        # Handle both string and dictionary messages
+        if isinstance(message, dict):
+            status = message.get('status', 'Unknown status')
+            print(f"MVGen Status: {status}")
+        else:
+            print(f"MVGen Status: {message}")
 
 def search_youtube(prompt, api_key, max_results=5):
     print(f"Searching YouTube for: {prompt}")
@@ -63,72 +72,76 @@ def download_youtube_clips(video_ids):
 def generate_music_video(clips, audio_file):
     """
     Generate a music video using mvgen library by combining video clips with audio
-    
-    Args:
-        clips (list): List of paths to video clips
-        audio_file (str): Path to the audio file
-    
-    Returns:
-        str: Path to the generated music video
     """
     if not clips:
         raise ValueError("No video clips provided for music video generation")
         
+    if not audio_file:
+        raise ValueError("Audio file path cannot be None")
+        
+    if not os.path.exists(audio_file):
+        raise FileNotFoundError(f"Audio file not found at path: {audio_file}")
+        
+    # Get audio duration using moviepy
+    audio_clip = AudioFileClip(audio_file)
+    duration = audio_clip.duration
+    audio_clip.close()
+    
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Add debug logging
-        print(f"Temporary directory created at: {temp_dir}")
+        # Create directory structure expected by MVGen
+        temp_dir_abs = os.path.abspath(temp_dir)
+        raw_dir = os.path.join(temp_dir_abs, 'raw')
+        work_dir = os.path.join(temp_dir_abs, 'work')
+        ready_dir = os.path.join(temp_dir_abs, 'ready')
+        segments_dir = os.path.join(temp_dir_abs, 'segments')
         
-        clips_dir = os.path.join(temp_dir, 'clips')
-        os.makedirs(clips_dir, exist_ok=True)
-        
-        # Add debug logging
-        print(f"Clips directory created at: {clips_dir}")
-        print(f"Clips to process: {clips}")
-        
-        # Copy clips to the clips directory
-        clip_paths = []
+        # Create all required directories
+        for directory in [raw_dir, work_dir, ready_dir, segments_dir]:
+            os.makedirs(directory, exist_ok=True)
+            
+        # Copy clips to raw directory
+        sources = []
         for i, clip in enumerate(clips):
-            new_path = os.path.join(clips_dir, f'clip_{i}.mp4')
-            os.system(f'cp "{clip}" "{new_path}"')
-            clip_paths.append(new_path)
-        
-        # Add debug logging
-        print(f"Copied clips to: {clip_paths}")
-        
-        # Verify directory exists and has content
-        if not os.path.exists(clips_dir):
-            raise ValueError(f"Clips directory does not exist: {clips_dir}")
-        if not os.listdir(clips_dir):
-            raise ValueError(f"Clips directory is empty: {clips_dir}")
+            source_dir = os.path.join(raw_dir, f'source_{i}')
+            os.makedirs(source_dir, exist_ok=True)
             
-        # Add more robust path validation
-        if not os.path.isdir(clips_dir):
-            raise ValueError(f"Invalid clips directory: {clips_dir}")
-            
-        # Ensure all clips were copied successfully
-        if len(os.listdir(clips_dir)) != len(clips):
-            raise ValueError(f"Not all clips were copied successfully. Expected {len(clips)} clips, found {len(os.listdir(clips_dir))}")
+            try:
+                new_path = os.path.join(source_dir, f'clip_{i}.mp4')
+                import shutil
+                shutil.copy2(clip, new_path)
+                sources.append(f'source_{i}')
+            except (IOError, OSError) as e:
+                raise ValueError(f"Error copying clip {clip}: {str(e)}")
         
+        # Initialize MVGen with proper directory structure and custom FFmpeg options
+        notifier = SimpleNotifier()
         mvgen = MVGen(
-            work_directory=temp_dir,
-            uid=None
+            raw_dir, 
+            segments_dir,
+            work_dir
         )
+
+        mvgen.notifier = notifier
         
+        # Load audio and generate
         mvgen.load_audio(audio_file)
+        # Use a smaller duration value (e.g., 1 second) to create shorter segments
+        mvgen.generate(duration=1, sources=sources, src_directory=raw_dir)
         
-        # Ensure clips_dir is valid before passing to generate
-        if not clips_dir or not os.path.exists(clips_dir):
-            raise ValueError(f"Invalid clips directory before generate: {clips_dir}")
-            
-        # Pass the clips directory path directly
-        mvgen.generate(clips_dir)
-        
+        # Create and process the final video
         mvgen.make_join_file()
         output_path = mvgen.join()
         
-        # Create final output path
+        # Create final output path and finalize
         final_path = "generated_music_video.mp4"
-        mvgen.finalize(output_path, final_path)
+        mvgen.finalize(
+            ready_directory=ready_dir,
+            delete_work_dir=False  # Keep work dir until we're done
+        )
+        
+        # Copy the final video from ready_dir to current directory
+        final_video = os.path.join(ready_dir, output_path.name)
+        shutil.copy2(final_video, final_path)
         
         return final_path
 

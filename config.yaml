@@ -2,6 +2,8 @@
 video_source:
   use_youtube_search: true  # Set to false to use manual video input
   max_youtube_results: 5    # Number of YouTube videos to search for
+  prompt: f1 racing clips              # Optional: Set search prompt or video paths here
+  audio_file: /Users/leoasatoorian/Documents/UP.wav         # Optional: Set path to audio file
 
 # Video Processing
 video_processing:

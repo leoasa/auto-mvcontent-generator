@@ -16,7 +16,10 @@ def main():
     config_manager = ConfigManager()
     
     # Get user input based on configuration
-    input_data, audio_file = get_user_input(config_manager.use_youtube_search)
+    input_data, audio_file = get_user_input(config_manager)
+    
+    # Add status message
+    print(f"Searching for '{input_data}' clips for audio file at '{audio_file}'...")
     
     # Prepare video clips (either from YouTube or manual input)
     clips = prepare_video_clips(
