@@ -10,7 +10,12 @@ class ConfigManager:
         return self.config.get('video_source', {})
     
     def get_video_processing_config(self) -> Dict[str, Any]:
-        return self.config.get('video_processing', {})
+        return {
+            'fontsize': self.config.get('video_processing', {}).get('fontsize', 24),
+            'text_color': self.config.get('video_processing', {}).get('text_color', 'white'),
+            'text_position': self.config.get('video_processing', {}).get('text_position', 'bottom'),
+            'final_video_filename': self.config.get('output', {}).get('final_video_filename', 'final_video.mp4')
+        }
     
     def get_output_config(self) -> Dict[str, Any]:
         return self.config.get('output', {})

@@ -1,5 +1,6 @@
 from googleapiclient.discovery import build
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip
+from moviepy.config import change_settings
 import os
 from mvgen.mvgen import MVGen
 import tempfile
@@ -136,12 +137,17 @@ def generate_music_video(clips, audio_file):
         final_path = "generated_music_video.mp4"
         mvgen.finalize(
             ready_directory=ready_dir,
-            delete_work_dir=False  # Keep work dir until we're done
+            delete_work_dir=False
         )
         
+        # Use the correct filename that MVGen creates - "segments.mp4"
+        source_video = os.path.join(ready_dir, "segments.mp4")
+        
         # Copy the final video from ready_dir to current directory
-        final_video = os.path.join(ready_dir, output_path.name)
-        shutil.copy2(final_video, final_path)
+        if not os.path.exists(source_video):
+            raise FileNotFoundError(f"MVGen did not create the expected output file at {source_video}")
+        
+        shutil.copy2(source_video, final_path)
         
         return final_path
 
@@ -160,15 +166,41 @@ def prepare_video_clips(config_manager: ConfigManager, prompt: str = None, video
         return video_paths
 
 def add_lyrics_overlay(video_path: str, lyrics: str, config: dict) -> str:
-    """Add lyrics overlay with configurable parameters"""
+    # Configure MoviePy to use ImageMagick
+    if os.name == 'nt':  # Windows
+        change_settings({"IMAGEMAGICK_BINARY": r"C:\\Program Files\\ImageMagick-7.0.10-Q16\\magick.exe"})
+    else:  # macOS/Linux
+        change_settings({"IMAGEMAGICK_BINARY": "convert"})
+    
     video = VideoFileClip(video_path)
+    
+    # Create text clip with proper font
     txt_clip = TextClip(
         lyrics, 
         fontsize=config.get('fontsize', 24),
-        color=config.get('text_color', 'white')
+        color=config.get('text_color', 'white'),
+        font='Arial'  # Specify a common font
     )
-    txt_clip = txt_clip.set_position(config.get('text_position', 'bottom')).set_duration(video.duration)
+    
+    # Position the text
+    position = config.get('text_position', 'bottom')
+    if position == 'bottom':
+        txt_clip = txt_clip.set_position(('center', 'bottom')).set_duration(video.duration)
+    elif position == 'top':
+        txt_clip = txt_clip.set_position(('center', 'top')).set_duration(video.duration)
+    else:
+        txt_clip = txt_clip.set_position('center').set_duration(video.duration)
+    
+    # Combine video and text
     final_clip = CompositeVideoClip([video, txt_clip])
+    
+    # Write output
     output_path = config.get('final_video_filename', "final_video.mp4")
     final_clip.write_videofile(output_path)
-    return output_path 
+    
+    # Clean up
+    video.close()
+    txt_clip.close()
+    final_clip.close()
+    
+    return output_path

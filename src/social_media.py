@@ -7,9 +7,9 @@ from .config import TIKTOK_API_KEY, TIKTOK_API_SECRET, TIKTOK_REDIRECT_URI
 
 class TikTokAPI:
     def __init__(self):
-        self.auth_url = 'https://www.tiktok.com/v2/auth/authorize/'
-        self.post_url = 'https://open.tiktokapis.com/v2/post/publish/video/init/'
-        self.status_url = 'https://open.tiktokapis.com/v2/post/publish/status/fetch/'
+        self.auth_url = 'https://sandbox-open.tiktok.com/v2/auth/authorize/'
+        self.post_url = 'https://sandbox-open.tiktokapis.com/v2/post/publish/video/init/'
+        self.status_url = 'https://sandbox-open.tiktokapis.com/v2/post/publish/status/fetch/'
         self.access_token: Optional[str] = None
         
     def generate_auth_params(self) -> tuple[str, str, str]:

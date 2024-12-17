@@ -11,6 +11,6 @@ def get_env_variable(name):
 
 TIKTOK_API_KEY = get_env_variable('TIKTOK_API_KEY')
 TIKTOK_API_SECRET = get_env_variable('TIKTOK_API_SECRET')
-TIKTOK_REDIRECT_URI = 'http://localhost:3000/callback'
+TIKTOK_REDIRECT_URI = 'https://ee3d-76-32-219-213/callback'
 YOUTUBE_API_KEY = get_env_variable('YOUTUBE_API_KEY')
 OPENAI_API_KEY = get_env_variable('OPENAI_API_KEY')
