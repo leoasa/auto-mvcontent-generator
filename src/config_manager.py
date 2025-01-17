@@ -9,6 +9,18 @@ class ConfigManager:
     def get_video_source_config(self) -> Dict[str, Any]:
         return self.config.get('video_source', {})
     
+    @property
+    def video_source_method(self) -> str:
+        return self.get_video_source_config().get('method', 'youtube_search')
+    
+    @property
+    def youtube_links(self) -> list:
+        return self.get_video_source_config().get('youtube_links', [])
+    
+    @property
+    def file_paths(self) -> list:
+        return self.get_video_source_config().get('file_paths', [])
+    
     def get_video_processing_config(self) -> Dict[str, Any]:
         return {
             'fontsize': self.config.get('video_processing', {}).get('fontsize', 24),
@@ -22,7 +34,8 @@ class ConfigManager:
     
     @property
     def use_youtube_search(self) -> bool:
-        return self.get_video_source_config().get('use_youtube_search', True)
+        """Check if using YouTube search"""
+        return self.video_source_method == "youtube_search"
     
     @property
     def max_youtube_results(self) -> int:
@@ -38,4 +51,49 @@ class ConfigManager:
     
     @property
     def has_predefined_input(self) -> bool:
-        return self.prompt is not None and self.audio_file is not None
+        """Check if input is predefined in config"""
+        if self.use_youtube_search:
+            return bool(self.prompt)
+        return bool(self.youtube_links or self.file_paths)
+    
+    def get_audio_source_config(self) -> Dict[str, Any]:
+        return self.config.get('audio_source', {})
+    
+    @property
+    def audio_source_method(self) -> str:
+        return self.get_audio_source_config().get('method', 'file')
+    
+    @property
+    def audio_file_path(self) -> str:
+        return self.get_audio_source_config().get('file_path')
+    
+    @property
+    def audio_youtube_link(self) -> str:
+        return self.get_audio_source_config().get('youtube_link')
+    
+    @property
+    def output_directory(self) -> str:
+        return self.config.get('output', {}).get('output_directory', './output')
+    
+    @property
+    def should_post_to_social(self) -> bool:
+        return self.config.get('output', {}).get('post_to_social', False)
+    
+    @property
+    def combined_sources(self) -> list:
+        """Get combined video sources from config"""
+        return self.get_video_source_config().get('sources', [])
+    
+    @property
+    def rhythm_patterns(self) -> list:
+        """Get rhythm patterns from config"""
+        patterns = self.config.get('rhythm_patterns', [])
+        return sorted(patterns, key=lambda x: x.get('timestamp', 0))
+    
+    def get_pattern_at_timestamp(self, timestamp: float) -> str:
+        """Get the rhythm pattern active at a given timestamp"""
+        patterns = self.rhythm_patterns
+        for pattern in reversed(patterns):
+            if timestamp >= pattern.get('timestamp', 0):
+                return pattern.get('pattern', '1/4')
+        return '1/4'  # Default to quarter notes

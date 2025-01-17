@@ -1,9 +1,31 @@
 # Video Source Configuration
 video_source:
-  use_youtube_search: true  # Set to false to use manual video input
-  max_youtube_results: 5    # Number of YouTube videos to search for
-  prompt: f1 racing clips              # Optional: Set search prompt or video paths here
-  audio_file: /Users/leoasatoorian/Documents/UP.wav         # Optional: Set path to audio file
+  method: "youtube_search"  # Options: "youtube_search", "youtube_links", "file_paths", "combination"
+  max_youtube_results: 5    
+  prompt: "fashion week clips"    # Used for youtube_search
+  # For combination method:
+  # To use only YouTube links, leave file_paths empty
+  # To use only local files, leave youtube_links empty
+  # To use both, add entries to both lists
+  youtube_links: 
+    - ""
+  file_paths: 
+    - ""
+
+# Rhythm Configuration
+rhythm_patterns:
+  - timestamp: 5.3    # Seconds into video
+    pattern: "1/8"    # Musical note duration (1/4 = quarter, 1/8 = eighth, etc)
+  - timestamp: 15.7
+    pattern: "1/4"
+  - timestamp: 30.2
+    pattern: "1/16"
+
+# Audio Source Configuration
+audio_source:
+  method: "file"           # Options: "file", "youtube"
+  file_path: "/Users/leoasatoorian/Documents/UP.wav"  # Used when method is "file"
+  youtube_link: ""         # Used when method is "youtube"
 
 # Video Processing
 video_processing:
@@ -14,4 +36,6 @@ video_processing:
 # Output Configuration
 output:
   music_video_filename: "generated_music_video.mp4"
-  final_video_filename: "final_video.mp4" 
+  final_video_filename: "final_video.mp4"
+  output_directory: "./output"  # Directory for output files
+  post_to_social: false    # Whether to post directly to social media 
