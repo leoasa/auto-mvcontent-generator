@@ -33,7 +33,7 @@ def main():
     
     # Generate music video
     output_config = config_manager.get_output_config()
-    edited_video = generate_music_video(clips, audio_file)
+    edited_video = generate_music_video(clips, audio_file, config_manager)
     
     # Get lyrics using Whisper
     lyrics = transcribe_audio(audio_file)
@@ -45,12 +45,17 @@ def main():
         config_manager.get_video_processing_config()
     )
     
-    # Post to TikTok with a title
-    title = f"AI-generated music video for: {input_data if config_manager.use_youtube_search else 'custom clips'}"
-    success = post_to_tiktok(final_video, title)
+    # Save final video
+    final_video_path = os.path.join(config_manager.output_directory, final_video)
     
-    if not success:
-        print("Failed to post video to TikTok")
+    # Post to TikTok only if configured to do so
+    if config_manager.should_post_to_social:
+        title = f"AI-generated music video for: {input_data if config_manager.use_youtube_search else 'custom clips'}"
+        success = post_to_tiktok(final_video_path, title)
+        if not success:
+            print("Failed to post video to TikTok")
+    else:
+        print(f"Video saved to: {final_video_path}")
     
     # Cleanup temporary files
     cleanup_files(
