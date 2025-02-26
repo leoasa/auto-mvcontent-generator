@@ -13,13 +13,13 @@ video_source:
     - ""
 
 # Rhythm Configuration
-rhythm_patterns:
-  - timestamp: 5.3    # Seconds into video
-    pattern: "1/8"    # Musical note duration (1/4 = quarter, 1/8 = eighth, etc)
-  - timestamp: 15.7
-    pattern: "1/4"
-  - timestamp: 30.2
-    pattern: "1/16"
+# rhythm_patterns:
+#   - timestamp: 5.3    # Seconds into video
+#     pattern: "1/8"    # Musical note duration (1/4 = quarter, 1/8 = eighth, etc)
+#   - timestamp: 15.7
+#     pattern: "1/4"
+#   - timestamp: 30.2
+#     pattern: "1/16"
 
 # Audio Source Configuration
 audio_source:
@@ -29,6 +29,7 @@ audio_source:
 
 # Video Processing
 video_processing:
+  enable_lyrics: false    # Toggle lyrics transcription and overlay
   fontsize: 24             # Font size for lyrics overlay
   text_color: "white"      # Color of lyrics text
   text_position: "bottom"  # Position of lyrics overlay
