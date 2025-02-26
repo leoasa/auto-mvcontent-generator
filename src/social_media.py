@@ -3,6 +3,7 @@ import hashlib
 import secrets
 import requests
 from typing import Optional
+from typing_extensions import Tuple
 from .config import TIKTOK_API_KEY, TIKTOK_API_SECRET, TIKTOK_REDIRECT_URI
 
 class TikTokAPI:
@@ -12,7 +13,7 @@ class TikTokAPI:
         self.status_url = 'https://tiktokapis.com/v2/post/publish/status/fetch/'
         self.access_token: Optional[str] = None
         
-    def generate_auth_params(self) -> tuple[str, str, str]:
+    def generate_auth_params(self) -> Tuple[str, str, str]:
         """Generate PKCE parameters for TikTok authentication"""
         # Generate code verifier
         code_verifier = secrets.token_urlsafe(64)[:128]

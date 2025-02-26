@@ -1,5 +1,6 @@
 import yaml
 from typing import Dict, Any
+import os
 
 class ConfigManager:
     def __init__(self, config_path: str = "config.yaml"):
@@ -97,3 +98,8 @@ class ConfigManager:
             if timestamp >= pattern.get('timestamp', 0):
                 return pattern.get('pattern', '1/4')
         return '1/4'  # Default to quarter notes
+    
+    @property
+    def enable_lyrics(self) -> bool:
+        """Check if lyrics processing is enabled"""
+        return self.config.get('video_processing', {}).get('enable_lyrics', False)

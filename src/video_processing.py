@@ -1,10 +1,13 @@
 from googleapiclient.discovery import build
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip, ColorClip
 from moviepy.config import change_settings
+from src.audio_processing import get_duration
 import os
 from mvgen.mvgen import MVGen
 import tempfile
 from .config_manager import ConfigManager
+import subprocess
+import shutil
 
 class SimpleNotifier:
     def notify(self, message):
@@ -97,50 +100,73 @@ def download_youtube_clips(video_ids):
         output_path = f'clip_{vid_id}.mp4'
         final_path = f'vertical_clip_{vid_id}.mp4'
         
-        # Download the clip
+        # Download the clip with more robust options
         ydl_opts = {
             'format': 'mp4',
             'outtmpl': output_path,
+            # Add timeout and retry options
+            'socket_timeout': 30,  # Increase timeout to 30 seconds
+            'retries': 10,        # Increase retry attempts
+            'fragment_retries': 10,
+            'retry_sleep': lambda n: 5 * (n + 1),  # Exponential backoff
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            url = f'https://youtube.com/watch?v={vid_id}'
-            ydl.download([url])
         
-        # Load and process the clip
-        with VideoFileClip(output_path) as clip:
-            # Fit to vertical aspect ratio
-            processed_clip = fit_to_vertical(clip)
-            
-            # Create a black background with 9:16 ratio
-            target_height = processed_clip.h
-            target_width = int(target_height * 9/16)
-            
-            # Create black background
-            bg = ColorClip(size=(target_width, target_height), 
-                         color=(0,0,0),
-                         duration=processed_clip.duration)
-            
-            # Center the video on black background
-            x_center = (target_width - processed_clip.w) // 2
-            y_center = (target_height - processed_clip.h) // 2
-            
-            final_clip = CompositeVideoClip([
-                bg,
-                processed_clip.set_position((x_center, y_center))
-            ])
-            
-            # Write the final clip
-            final_clip.write_videofile(
-                final_path,
-                codec='libx264',
-                audio_codec='aac',
-                preset='medium'
-            )
-            
-            clips.append(final_path)
-            
-            # Clean up original clip
-            os.remove(output_path)
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    url = f'https://youtube.com/watch?v={vid_id}'
+                    print(f"Downloading {url} (Attempt {attempt + 1}/{max_attempts})")
+                    ydl.download([url])
+                break  # Success, exit the retry loop
+            except Exception as e:
+                print(f"Error downloading {vid_id} (Attempt {attempt + 1}/{max_attempts}): {str(e)}")
+                if attempt == max_attempts - 1:  # Last attempt
+                    print(f"Failed to download {vid_id} after {max_attempts} attempts, skipping...")
+                    continue  # Skip to next video
+                import time
+                time.sleep(5 * (attempt + 1))  # Wait before retrying
+        
+        # Process the clip if download was successful
+        if os.path.exists(output_path):
+            try:
+                with VideoFileClip(output_path) as clip:
+                    processed_clip = fit_to_vertical(clip)
+                    
+                    target_height = processed_clip.h
+                    target_width = int(target_height * 9/16)
+                    
+                    bg = ColorClip(size=(target_width, target_height), 
+                                 color=(0,0,0),
+                                 duration=processed_clip.duration)
+                    
+                    x_center = (target_width - processed_clip.w) // 2
+                    y_center = (target_height - processed_clip.h) // 2
+                    
+                    final_clip = CompositeVideoClip([
+                        bg,
+                        processed_clip.set_position((x_center, y_center))
+                    ])
+                    
+                    final_clip.write_videofile(
+                        final_path,
+                        codec='libx264',
+                        audio_codec='aac',
+                        preset='medium',
+                        fps=30,  # Ensure consistent framerate
+                        bitrate='8000k',  # Higher bitrate for better quality
+                        threads=4  # Parallel processing
+                    )
+                    
+                    clips.append(final_path)
+                    
+                    # Clean up original clip
+                    os.remove(output_path)
+            except Exception as e:
+                print(f"Error processing {vid_id}: {str(e)}")
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                continue
     
     return clips
 
@@ -156,68 +182,91 @@ def generate_music_video(clips, audio_file, config_manager=None):
         raise FileNotFoundError(f"Audio file not found at path: {audio_file}")
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Initialize MVGen with work directory
-        mvgen = MVGen(
-            work_directory=temp_dir,
-            uid=None
-        )
+        # Create directory structure expected by MVGen
+        temp_dir_abs = os.path.abspath(temp_dir)
+        raw_dir = os.path.join(temp_dir_abs, 'raw')
+        work_dir = os.path.join(temp_dir_abs, 'work')
+        ready_dir = os.path.join(temp_dir_abs, 'ready')
+        segments_dir = os.path.join(temp_dir_abs, 'segments')
         
-        # Add notifier for status updates
-        notifier = SimpleNotifier()
-        mvgen.notifier = notifier
-        
-        # Create clips directory
-        clips_dir = os.path.join(temp_dir, 'clips')
-        os.makedirs(clips_dir, exist_ok=True)
-        
-        # Copy clips to clips directory
+        # Create all required directories
+        for directory in [raw_dir, work_dir, ready_dir, segments_dir]:
+            os.makedirs(directory, exist_ok=True)
+            
+        # Copy clips to raw directory
         sources = []
         for i, clip in enumerate(clips):
-            source_dir = os.path.join(clips_dir, f'source_{i}')
+            source_dir = os.path.join(raw_dir, f'source_{i}')
             os.makedirs(source_dir, exist_ok=True)
             
             try:
-                video_path = os.path.join(source_dir, 'video.mp4')
+                new_path = os.path.join(source_dir, f'clip_{i}.mp4')
                 import shutil
-                shutil.copy2(clip, video_path)
+                shutil.copy2(clip, new_path)
                 sources.append(f'source_{i}')
             except (IOError, OSError) as e:
                 raise ValueError(f"Error copying clip {clip}: {str(e)}")
-        
-        # Create necessary directories
-        os.makedirs(os.path.join(temp_dir, 'segments'), exist_ok=True)
-        os.makedirs(os.path.join(temp_dir, 'random'), exist_ok=True)
-        
-        # Load audio and set rhythm patterns if available
-        mvgen.load_audio(audio_file)
-        if config_manager and hasattr(config_manager, 'rhythm_patterns'):
-            mvgen.rhythm_patterns = config_manager.rhythm_patterns
-            
-        # Force CPU encoding and set segment codec
-        mvgen.cuda = False
-        mvgen.segment_codec = '-c:v libx264 -preset ultrafast -crf 23'
-        
-        # Generate with duration and sources
-        mvgen.generate(
-            duration=1,
-            sources=sources,
-            src_directory=clips_dir,
+
+        # Initialize MVGen with proper directory structure
+        notifier = SimpleNotifier()
+        mvgen = MVGen(
+            notifier=SimpleNotifier(),
+            work_directory=temp_dir_abs,
         )
         
-        # Use CPU encoding for joining
-        mvgen.output_codec = '-c:v libx264 -preset medium -crf 23'
+        # Add this line before generate
+        mvgen.load_audio(audio_file)
         
+        # Simplified generate call with only required parameters
+        mvgen.generate(
+            duration=2,
+            sources=sources,
+            src_directory=raw_dir
+        )
+        
+        # Create and process the final video
         mvgen.make_join_file()
         output_path = mvgen.join()
         
-        # Create final output path using config
-        output_config = config_manager.get_output_config() if config_manager else {}
-        final_path = output_config.get('music_video_filename', "generated_music_video.mp4")
+        # Get output configuration
+        output_dir = os.path.abspath(config_manager.output_directory)
+        print(f"Output directory resolved to: {output_dir}")  # Debug logging
+        os.makedirs(output_dir, exist_ok=True, mode=0o755)
+        
+        output_filename = config_manager.get_output_config().get('music_video_filename', 'generated_music_video.mp4')
+        final_output = os.path.join(output_dir, output_filename)
         
         # Finalize the video
-        mvgen.finalize(output_path, final_path)
+        mvgen.finalize(
+            ready_directory=ready_dir,
+            delete_work_dir=False
+        )
         
-        return final_path
+        # List files in ready directory to find the output
+        ready_files = os.listdir(ready_dir)
+        mp4_files = [f for f in ready_files if f.endswith('.mp4')]
+        if not mp4_files:
+            raise FileNotFoundError(f"No MP4 files found in {ready_dir}")
+        
+        # Use the first (and should be only) MP4 file
+        source_video = os.path.join(ready_dir, mp4_files[0])
+        
+        # When setting root_output
+        root_output = os.path.join(os.getcwd(), "exports", output_filename)
+        os.makedirs(os.path.dirname(root_output), exist_ok=True, mode=0o755)
+        
+        # Then copy
+        shutil.copy2(source_video, root_output)
+        
+        # Verification step
+        print(f"Root output path: {os.path.abspath(root_output)}")
+        if not os.path.exists(root_output):
+            print(f"File missing at: {root_output}")
+            print(f"Current working directory: {os.getcwd()}")
+            print(f"Directory contents: {os.listdir(os.path.dirname(root_output))}")
+            raise RuntimeError(f"Copy failed - verify permissions for {os.path.dirname(root_output)}")
+        
+        return final_output
 
 def prepare_video_clips(config_manager: ConfigManager, prompt: str = None, video_paths: list = None, api_key: str = None) -> list:
     """Prepare video clips based on configuration"""
